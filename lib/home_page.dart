@@ -24,7 +24,32 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadSites() async {
     final prefs = await SharedPreferences.getInstance();
     sites = prefs.getStringList('sites') ??
-        ["https://flutter.dev", "https://news.ycombinator.com"];
+        [
+          // English News
+          "https://www.bbc.com/news",
+          "https://www.reuters.com",
+          "https://www.nytimes.com",
+          "https://www.theguardian.com",
+          "https://www.aljazeera.com",
+          // Arabic News
+          "https://www.aljazeera.net",
+          "https://www.alarabiya.net",
+          "https://www.skynewsarabia.com",
+          "https://www.bbc.com/arabic",
+          "https://aawsat.com",
+          // French News
+          "https://www.lemonde.fr",
+          "https://www.lefigaro.fr",
+          "https://www.france24.com/fr",
+          "https://www.rfi.fr/fr",
+          "https://www.liberation.fr",
+          // Algerian News
+          "https://www.tsa-algerie.com",
+          "https://www.elwatan-dz.com",
+          "https://www.elkhabar.com",
+          "https://www.echoroukonline.com",
+          "https://www.aps.dz"
+        ];
     titles = jsonDecode(prefs.getString('site_titles') ?? "{}").cast<String, String>();
     setState(() {});
     _refreshAllTitles();

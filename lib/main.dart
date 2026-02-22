@@ -22,6 +22,11 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: Colors.blueAccent,
+        textSelectionTheme: TextSelectionThemeData(
+          selectionColor: Colors.blueAccent.withOpacity(0.3),
+          selectionHandleColor: Colors.blueAccent,
+          cursorColor: Colors.blueAccent,
+        ),
       ),
       home: const HomePage(),
     );
