@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class BrowserPage extends StatefulWidget {
   final List<String> allowedSites;
@@ -24,6 +26,12 @@ class _BrowserPageState extends State<BrowserPage> {
   double progress = 0;
 
   final Set<String> sessionAllowedHosts = {};
+
+  @override
+  void dispose() {
+    webViewController?.clearCache();
+    super.dispose();
+  }
 
   String _getDomainRoot(String host) {
     final parts = host.toLowerCase().split('.');
@@ -87,13 +95,17 @@ class _BrowserPageState extends State<BrowserPage> {
     );
   }
 
-  Future<void> _translateText(String text) async {
-    // Show a loading indicator
+  Future<void> _translateText(
+    String text,
+    String targetLang,
+    String label,
+  ) async {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E1E1E),
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => const SizedBox(
         height: 150,
         child: Center(child: CircularProgressIndicator()),
@@ -101,13 +113,15 @@ class _BrowserPageState extends State<BrowserPage> {
     );
 
     try {
-      final response = await http.get(Uri.parse(
-          "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q=${Uri.encodeComponent(text)}"));
+      final response = await http.get(
+        Uri.parse(
+          "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=${Uri.encodeComponent(text)}",
+        ),
+      );
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        
-        // Extract and join all translation segments
+
         String fullTranslation = "";
         if (data.isNotEmpty && data[0] is List) {
           for (var segment in data[0]) {
@@ -118,28 +132,30 @@ class _BrowserPageState extends State<BrowserPage> {
         }
 
         if (mounted) {
-          Navigator.pop(context); // Close loading
+          Navigator.pop(context);
           if (fullTranslation.isNotEmpty) {
-            _showTranslationResult(fullTranslation);
+            _showTranslationResult(fullTranslation, label);
           }
         }
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Erreur de traduction")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Erreur de traduction")));
       }
     }
   }
 
-  void _showTranslationResult(String translation) {
+  void _showTranslationResult(String translation, String label) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF1E1E1E),
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.4,
         minChildSize: 0.2,
@@ -155,23 +171,28 @@ class _BrowserPageState extends State<BrowserPage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2)),
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              const Text("TRADUCTION",
-                  style: TextStyle(
-                      color: Colors.blueAccent,
-                      letterSpacing: 1.5,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold)),
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.blueAccent,
+                  letterSpacing: 1.5,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 20),
               SelectableText(
                 translation,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    height: 1.6,
-                    fontWeight: FontWeight.w400),
+                  color: Colors.white,
+                  fontSize: 17,
+                  height: 1.6,
+                  fontWeight: FontWeight.w400,
+                ),
                 textAlign: TextAlign.left,
               ),
             ],
@@ -211,21 +232,79 @@ class _BrowserPageState extends State<BrowserPage> {
                   contextMenu: ContextMenu(
                     menuItems: [
                       ContextMenuItem(
+                        id: 2,
+                        androidId: 2,
+                        iosId: "2",
+                        title: "Traduire en Arabe",
+                        action: () async {
+                          final selectedText = await webViewController
+                              ?.getSelectedText();
+                          if (selectedText != null && selectedText.isNotEmpty) {
+                            _translateText(
+                              selectedText,
+                              'ar',
+                              'Traduction Arabe',
+                            );
+                          }
+                        },
+                      ),
+                      ContextMenuItem(
                         id: 1,
                         androidId: 1,
                         iosId: "1",
                         title: "Traduire en Français",
                         action: () async {
-                          final selectedText =
-                              await webViewController?.getSelectedText();
+                          final selectedText = await webViewController
+                              ?.getSelectedText();
                           if (selectedText != null && selectedText.isNotEmpty) {
-                            _translateText(selectedText);
+                            _translateText(
+                              selectedText,
+                              'fr',
+                              'Traduction Français',
+                            );
+                          }
+                        },
+                      ),
+                      ContextMenuItem(
+                        id: 3,
+                        androidId: 3,
+                        iosId: "3",
+                        title: "Copier",
+                        action: () async {
+                          final selectedText = await webViewController
+                              ?.getSelectedText();
+                          if (selectedText != null && selectedText.isNotEmpty) {
+                            await Clipboard.setData(
+                              ClipboardData(text: selectedText),
+                            );
+                          }
+                        },
+                      ),
+                      ContextMenuItem(
+                        id: 4,
+                        androidId: 4,
+                        iosId: "4",
+                        title: "Recherche Web",
+                        action: () async {
+                          final selectedText = await webViewController
+                              ?.getSelectedText();
+                          if (selectedText != null && selectedText.isNotEmpty) {
+                            final searchUrl = Uri.parse(
+                              "https://www.google.com/search?q=${Uri.encodeComponent(selectedText)}",
+                            );
+                            if (await canLaunchUrl(searchUrl)) {
+                              await launchUrl(
+                                searchUrl,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
                           }
                         },
                       ),
                     ],
                     settings: ContextMenuSettings(
-                        hideDefaultSystemContextMenuItems: false),
+                      hideDefaultSystemContextMenuItems: true,
+                    ),
                   ),
                   initialSettings: InAppWebViewSettings(
                     javaScriptEnabled: true,
@@ -238,11 +317,14 @@ class _BrowserPageState extends State<BrowserPage> {
                   ),
                   onWebViewCreated: (c) {
                     webViewController = c;
-                    // Inject CSS to fix selection transparency inside the WebView
-                    c.addUserScript(userScript: UserScript(
-                      source: "var style = document.createElement('style'); style.innerHTML = '*::selection { background: rgba(68, 138, 255, 0.3) !important; }'; document.head.appendChild(style);",
-                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-                    ));
+                    c.addUserScript(
+                      userScript: UserScript(
+                        source:
+                            "var style = document.createElement('style'); style.innerHTML = '*::selection { background: rgba(68, 138, 255, 0.3) !important; }'; document.head.appendChild(style);",
+                        injectionTime:
+                            UserScriptInjectionTime.AT_DOCUMENT_START,
+                      ),
+                    );
                   },
                   onProgressChanged: (_, p) =>
                       setState(() => progress = p / 100),

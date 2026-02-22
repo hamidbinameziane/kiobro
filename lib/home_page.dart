@@ -52,7 +52,7 @@ class _HomePageState extends State<HomePage> {
         ];
     titles = jsonDecode(prefs.getString('site_titles') ?? "{}").cast<String, String>();
     setState(() {});
-    _refreshAllTitles();
+    // Removed _refreshAllTitles() to save resources on startup
   }
 
   Future<void> _refreshAllTitles() async {
