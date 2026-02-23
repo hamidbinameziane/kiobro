@@ -326,8 +326,6 @@ class _BrowserPageState extends State<BrowserPage> {
                     allowsInlineMediaPlayback: true,
                     cacheEnabled: true,
                     hardwareAcceleration: true,
-                    // Disable context menu
-                    disableContextMenu: true,
                   ),
                   onWebViewCreated: (c) {
                     webViewController = c;
