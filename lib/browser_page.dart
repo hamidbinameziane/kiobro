@@ -24,8 +24,17 @@ class BrowserPage extends StatefulWidget {
 class _BrowserPageState extends State<BrowserPage> {
   InAppWebViewController? webViewController;
   double progress = 0;
+  late Uint8List blackGifBytes;
 
   final Set<String> sessionAllowedHosts = {};
+
+  @override
+  void initState() {
+    super.initState();
+    blackGifBytes = base64Decode(
+      "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+    );
+  }
 
   @override
   void dispose() {
@@ -311,12 +320,18 @@ class _BrowserPageState extends State<BrowserPage> {
                     domStorageEnabled: true,
                     databaseEnabled: true,
                     useShouldOverrideUrlLoading: true,
+                    useShouldInterceptRequest: true,
                     supportMultipleWindows: true,
                     javaScriptCanOpenWindowsAutomatically: true,
                     allowsInlineMediaPlayback: true,
+                    cacheEnabled: true,
+                    hardwareAcceleration: true,
+                    // Disable context menu
+                    disableContextMenu: true,
                   ),
                   onWebViewCreated: (c) {
                     webViewController = c;
+
                     c.addUserScript(
                       userScript: UserScript(
                         source:
@@ -325,9 +340,98 @@ class _BrowserPageState extends State<BrowserPage> {
                             UserScriptInjectionTime.AT_DOCUMENT_START,
                       ),
                     );
+
+                    c.addUserScript(
+                      userScript: UserScript(
+                        source: """
+                          (function() {
+                            const blackGif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                            function blockImg(img) {
+                              if (!img.src || img.src === blackGif || img.src.startsWith('data:')) return;
+                              img.style.backgroundColor = 'black';
+                              img.draggable = false; // Disable system drag-and-drop
+                            }
+                            document.querySelectorAll('img').forEach(blockImg);
+                            new MutationObserver(ms => {
+                              for (let m of ms) {
+                                m.addedNodes.forEach(n => {
+                                  if (n.nodeType === 1) {
+                                    if (n.tagName === 'IMG') blockImg(n);
+                                    else n.querySelectorAll('img').forEach(blockImg);
+                                  }
+                                });
+                              }
+                            }).observe(document.documentElement, { childList: true, subtree: true });
+
+                            // Aggressively prevent website and system from stealing the long press
+                            window.addEventListener('contextmenu', function(e) {
+                              if (e.target.tagName === 'IMG' || e.target.closest('img')) {
+                                e.stopImmediatePropagation();
+                                e.preventDefault();
+                              }
+                            }, true);
+                            
+                            window.addEventListener('dragstart', function(e) {
+                              if (e.target.tagName === 'IMG' || e.target.closest('img')) {
+                                e.preventDefault();
+                              }
+                            }, true);
+                          })();
+                        """,
+                        injectionTime:
+                            UserScriptInjectionTime.AT_DOCUMENT_START,
+                      ),
+                    );
                   },
                   onProgressChanged: (_, p) =>
                       setState(() => progress = p / 100),
+                  onLongPressHitTestResult: (controller, hitTestResult) async {
+                    // This native event is our primary hook
+                    if (hitTestResult.type ==
+                            InAppWebViewHitTestResultType.IMAGE_TYPE ||
+                        hitTestResult.type ==
+                            InAppWebViewHitTestResultType
+                                .SRC_IMAGE_ANCHOR_TYPE) {
+                      String? url = hitTestResult.extra;
+                      if (url != null && !url.startsWith('data:')) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenImagePage(url: url),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  shouldInterceptRequest: (controller, request) async {
+                    if (request.isForMainFrame ?? false) return null;
+                    final uri = request.url;
+                    final url = uri.toString();
+                    if (url.contains('kiobro_force=1')) return null;
+                    final lowerUrl = url.toLowerCase();
+                    final urlWithoutQuery = lowerUrl.split('?').first;
+                    final isImg =
+                        RegExp(
+                          r'\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|avif|heic)',
+                        ).hasMatch(urlWithoutQuery) ||
+                        (request.headers?['Accept']?.toLowerCase().contains(
+                              'image',
+                            ) ??
+                            false);
+                    if (isImg) {
+                      return WebResourceResponse(
+                        contentType: "image/gif",
+                        data: blackGifBytes,
+                        statusCode: 200,
+                        reasonPhrase: "OK",
+                        headers: {
+                          'Cache-Control':
+                              'no-cache, no-store, must-revalidate',
+                        },
+                      );
+                    }
+                    return null;
+                  },
                   shouldOverrideUrlLoading: (controller, action) async {
                     final uri = action.request.url;
                     if (isUrlAllowed(uri)) return NavigationActionPolicy.ALLOW;
@@ -401,6 +505,49 @@ class _BrowserPageState extends State<BrowserPage> {
             onPressed: () => Navigator.pop(context),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class FullScreenImagePage extends StatelessWidget {
+  final String url;
+  const FullScreenImagePage({super.key, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Image.network(
+            url,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.blueAccent),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) => const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.broken_image, color: Colors.white24, size: 64),
+                SizedBox(height: 16),
+                Text(
+                  "Impossible de charger l'image",
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

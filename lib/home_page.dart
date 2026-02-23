@@ -23,10 +23,16 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadSites() async {
     final prefs = await SharedPreferences.getInstance();
-    sites = prefs.getStringList('sites') ??
+    sites =
+        prefs.getStringList('sites') ??
         [
+          // Algerian News
+          "https://www.tsa-algerie.com",
+          "https://www.elwatan-dz.com",
+          "https://www.elkhabar.com/nation",
+          "https://www.echoroukonline.com/algeria",
+          "https://www.aps.dz",
           // English News
-          "https://www.bbc.com/news",
           "https://www.reuters.com",
           "https://www.nytimes.com",
           "https://www.theguardian.com",
@@ -43,14 +49,10 @@ class _HomePageState extends State<HomePage> {
           "https://www.france24.com/fr",
           "https://www.rfi.fr/fr",
           "https://www.liberation.fr",
-          // Algerian News
-          "https://www.tsa-algerie.com",
-          "https://www.elwatan-dz.com",
-          "https://www.elkhabar.com",
-          "https://www.echoroukonline.com",
-          "https://www.aps.dz"
         ];
-    titles = jsonDecode(prefs.getString('site_titles') ?? "{}").cast<String, String>();
+    titles = jsonDecode(
+      prefs.getString('site_titles') ?? "{}",
+    ).cast<String, String>();
     setState(() {});
     // Removed _refreshAllTitles() to save resources on startup
   }
@@ -80,9 +82,15 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTitle(String url) async {
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
+      final res = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
-        final match = RegExp(r'<title>(.*?)</title>', caseSensitive: false, dotAll: true).firstMatch(res.body);
+        final match = RegExp(
+          r'<title>(.*?)</title>',
+          caseSensitive: false,
+          dotAll: true,
+        ).firstMatch(res.body);
         if (match != null) {
           final title = match.group(1)!.replaceAll(RegExp(r'\s+'), ' ').trim();
           setState(() => titles[url] = title);
@@ -119,7 +127,10 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         leading: const Icon(Icons.language, color: Colors.blueAccent),
-        title: const Text("Kiobro", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Kiobro",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -173,15 +184,24 @@ class _HomePageState extends State<HomePage> {
           onTap: () => _openBrowser(url),
           leading: CircleAvatar(
             backgroundColor: Colors.blueGrey.shade800,
-            child: Text(domain.characters.first.toUpperCase(), style: const TextStyle(color: Colors.white)),
+            child: Text(
+              domain.characters.first.toUpperCase(),
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
           title: Text(
             titles[url] ?? domain,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Text(domain, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          subtitle: Text(
+            domain,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
           trailing: const Icon(Icons.drag_indicator, color: Colors.white24),
         ),
       ),
@@ -204,7 +224,10 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
           ElevatedButton(
             onPressed: () {
               _addSite(controller.text);
